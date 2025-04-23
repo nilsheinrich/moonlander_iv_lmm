@@ -23,9 +23,9 @@ N_iterations <- 1000 # scale up to 10000 for journal submission
 
 ```{r data, include=FALSE}
 
-setwd('/Users/heinrich/Projects/Moonlander_iiii_LMM/')
+setwd('/Users/heinrich/Projects/Moonlander_iv_LMM/')
 
-soc_data <- read_csv('data/soc_data_iiii.csv')
+soc_data <- read_csv('data/soc_data_iv.csv')
 
 ```
 
