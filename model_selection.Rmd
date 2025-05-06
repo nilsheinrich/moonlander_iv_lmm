@@ -17,7 +17,7 @@ library(lme4)
 library(lmerTest)
 
 set.seed(36)
-N_iterations <- 1000 # scale up to 10000 for journal submission
+N_iterations <- 10000
 
 ```
 
@@ -68,44 +68,47 @@ lambda_soc$x[which(lambda_soc$y == max(lambda_soc$y))]
 
 ```
 
-lambda, the expected value is close to 1.0. We won't transform the predicted variable in this case.
+lambda, the expected value is close to 0.5. We will therefore apply a square root transformation to the predicted variable.
 
 ## ICC for randon intercept effect ID
 
 ```{r null_model, include=FALSE}
 
-null.1 <- lmer(SoC ~ 1 + (1|ID), data = soc_data, REML=FALSE)
+null.1 <- lmer(sqrt(SoC) ~ 1 + (1|ID), data = soc_data, REML=FALSE)
 summary(null.1)
 
 ```
 
 Inter-Class Correlation
+
+$\sqrt{\frac{Variance_{ID}}{Variance_{ID} + Variance_{residual}}}$
+
 ```{r ICC, include=FALSE}
 
-0.6103 / (0.6103+1.9974)
+0.08592 / (0.08592+0.10779)
 
 ```
 
-Roughly 23.4% of the total variance is explained by the random intercept effect ID. 
+Roughly 44.35% of the total variance is explained by the random intercept effect ID. 
 
 ## Exploring fixed effects
 We gathered a multitude of interesting variables that might influence the SoC reported by participants after every trial. In an initial model, we will simply throw all of the in the fixed effects structure and see what sticks.
 
 ```{r fix_1, include=FALSE}
 
-fix.1 <- lmer(SoC ~ expectancy + N_drift*crashed + trials_since_last_crash + N_consecutive_crash_success + 
+fix.1 <- lmer(sqrt(SoC) ~ expectancy + N_drift*crashed + trials_since_last_crash + N_consecutive_crash_success + 
                 Neuroticism + Extraversion + Openness + Conscientiousness + Agreeableness + (1|ID), data = soc_data, REML=FALSE)
 summary(fix.1)
 
 ```
 
-**ALL** variables significantly influence the predicted variable SoC. We might only want to look out for *Neuroticism*. When introducing random slopes later on, variance could be absorbed resulting in non-significance. Let's see
+**None** of the NEO-FFI variables significantly influence the predicted variable SoC. We might only want to look out for *Neuroticism*. When deleting some fixed effects there might be more variance loading on *Neuroticism*, revealing a significant effect. Let's see...
 
-For *trials_since_last_crash* we will put in a variable that assesses whether there was a crash in the last trial. This is less informative due to only being binary, but we may reduce complexity.
+For *trials_since_last_crash* we will put in a variable that assesses whether there was a crash in the last trial. This is less informative due to only being binary, but we may reduce complexity this way.
 
 ```{r fix_2, include=FALSE}
 
-fix.2 <- lmer(SoC ~ expectancy + N_drift*crashed + crashed_in_last_trial + N_consecutive_crash_success + 
+fix.2 <- lmer(sqrt(SoC) ~ expectancy + N_drift*crashed + crashed_in_last_trial + N_consecutive_crash_success + 
                 Neuroticism + Extraversion + Openness + Conscientiousness + Agreeableness + (1|ID), data = soc_data, REML=FALSE)
 summary(fix.2)
 
@@ -113,216 +116,234 @@ summary(fix.2)
 
 We will keep *crashed_in_last_trial* instead of *trials_since_last_crash*. It's estimate is higher while also reaching significance.
 
-We will try to delete *Neuroticism* now and see what happens.
+Now we can go on and delete redundant variables, starting with *Conscientiousness* (the one with the worst p value).
 
 ```{r fix_3, include=FALSE}
 
-fix.3 <- lmer(SoC ~ expectancy + N_drift*crashed + crashed_in_last_trial + N_consecutive_crash_success + 
-                Extraversion + Openness + Conscientiousness + Agreeableness + (1|ID), data = soc_data, REML=FALSE)
+fix.3 <- lmer(sqrt(SoC) ~ expectancy + N_drift*crashed + crashed_in_last_trial + N_consecutive_crash_success + 
+                Neuroticism + Extraversion + Openness + Agreeableness + (1|ID), data = soc_data, REML=FALSE)
 summary(fix.3)
 
 ```
 
-Oh wow a lot happened... The neo-ffi dimension seem to be highly correlated. 
+Like we expected, all the other dimensions absorbed the variance of the deleted *Conscientiousness*. The NEO-FFI dimensions seem to be highly correlated in their effect on SoC.
 
 ```{r 2vs3, include=FALSE}
 
 anova(fix.2, fix.3)
 
 ```
-And we can delete *Neuroticism*. It will increase the predictive power of our model significantly (referring to BIC, smaller is better here, and Pr(>Chisq)).
+And we can delete *Conscientiousness*. It will increase the predictive power of our model (referring to BIC, smaller is better here) while the model likelihood not being significantly different.
 
-Let's try to reduce the model structure even more.
+Let's try to reduce the model structure even more: deleting *Agreeableness*.
 ```{r fix_4, include=FALSE}
 
-fix.4 <- lmer(SoC ~ expectancy + N_drift*crashed + crashed_in_last_trial + N_consecutive_crash_success + 
-                Extraversion + Openness + Agreeableness + (1|ID), data = soc_data, REML=FALSE)
+fix.4 <- lmer(sqrt(SoC) ~ expectancy + N_drift*crashed + crashed_in_last_trial + N_consecutive_crash_success + 
+                Neuroticism + Extraversion + Openness + (1|ID), data = soc_data, REML=FALSE)
 summary(fix.4)
 
 anova(fix.3, fix.4)
 
 ```
+Again a safe deletion without significantly affecting model likelihood but increasing predictive power.
 
+Proceeding by deleting *Extraversion*:
 ```{r fix_5, include=FALSE}
 
-fix.5 <- lmer(SoC ~ expectancy + N_drift*crashed + crashed_in_last_trial + N_consecutive_crash_success + Agreeableness + (1|ID), data = soc_data, REML=FALSE)
+fix.5 <- lmer(sqrt(SoC) ~ expectancy + N_drift*crashed + crashed_in_last_trial + N_consecutive_crash_success + 
+                Neuroticism + Openness + (1|ID), data = soc_data, REML=FALSE)
 summary(fix.5)
 
 anova(fix.4, fix.5)
 
 ```
+We will proceed with fix.5.
 
+Deleting *Neuroticism*:
 ```{r fix_6, include=FALSE}
 
-fix.6 <- lmer(SoC ~ expectancy + N_drift*crashed + crashed_in_last_trial + N_consecutive_crash_success + (1|ID), data = soc_data, REML=FALSE)
+fix.6 <- lmer(sqrt(SoC) ~ expectancy + N_drift*crashed + crashed_in_last_trial + N_consecutive_crash_success + Openness + (1|ID), data = soc_data, REML=FALSE)
 summary(fix.6)
 
 anova(fix.5, fix.6)
 
 ```
+Proceeding with fix.6.
 
-# SoC model for ICCM submission
-```{r fix_6_, include=FALSE}
+Let's see whether we can safely delete *Openness* as well:
+```{r fix_7, include=FALSE}
 
-summary(fix.6)
+fix.7 <- lmer(sqrt(SoC) ~ expectancy + N_drift*crashed + crashed_in_last_trial + N_consecutive_crash_success + (1|ID), data = soc_data, REML=FALSE)
+summary(fix.7)
 
-```
-
-```{r fix_6_bootstrap, include=FALSE}
-
-#confint(fix.6, nsim=N_iterations, parm=c('expectancy', 'N_drift', 'crashed', 'crashed_in_last_trial', 'N_consecutive_crash_success'), method='boot')
+anova(fix.6, fix.7)
 
 ```
+Proceeding with fix.7
+
+Now we can actually try to simplify the model fixed effects structure even more. This will mean that we delete a significant effect, but we will try anyway:
+
+Deleting *crashed_in_last_trial*:
+```{r fix_8, include=FALSE}
+
+fix.8 <- lmer(sqrt(SoC) ~ expectancy + N_drift*crashed + N_consecutive_crash_success + (1|ID), data = soc_data, REML=FALSE)
+summary(fix.8)
+
+anova(fix.7, fix.8)
+
+```
+Here we see a significant difference in the likelihood of the model (referring to Pr(>Chisq)). The BIC decreases, but the significance tells us to not just throw out *crashed_in_last_trial*. We will thus proceed with fix.7.
 
 ## Exploring random effects structure
+Now we're going to open up the slopes of our effects left in the model to change from one ID to the next.
 
-Same approach as before: we will simply dump possible random slope effects into the random effects structure of the model and see what happens. We will omit the neo-ffi variables here though. Their effects are small and would make model fitting very cumbersome...
+We're using the same approach as before: we will simply dump all possible random slope effects into the random effects structure of the model and see what sticks. We will omit the neo-ffi variables here, as none of those are left in the model.
 
 ```{r random_1, include=FALSE}
 
-random.1 <- lmer(SoC ~ expectancy + N_drift * crashed + crashed_in_last_trial + N_consecutive_crash_success + 
+random.1 <- lmer(sqrt(SoC) ~ expectancy + N_drift * crashed + crashed_in_last_trial + N_consecutive_crash_success + 
                    (1 + expectancy + N_drift*crashed + crashed_in_last_trial + N_consecutive_crash_success|ID), data = soc_data, REML=FALSE)
 summary(random.1)
 
 ```
+*fixed-effect model matrix is rank deficient so dropping 1 column / coefficient* is warning that we can ignore for now.
+*boundary (singular) fit: see help('isSingular')* and *Warning: Model failed to converge...* however we have to take seriously. They tell us that our model is **overparameterized** (we have too many random slopes in there that do not vary across IDs). We have to kick out random slopes.
 
+Starting with *N_consecutive_crash_success*:
 ```{r random_2, include=FALSE}
 
-random.2 <- lmer(SoC ~ expectancy + N_drift * crashed + crashed_in_last_trial + N_consecutive_crash_success + 
+random.2 <- lmer(sqrt(SoC) ~ expectancy + N_drift * crashed + crashed_in_last_trial + N_consecutive_crash_success + 
                    (1 + expectancy + N_drift*crashed + crashed_in_last_trial |ID), data = soc_data, REML=FALSE)
 summary(random.2)
 
 ```
+We still get the warnings. Let's also drop *crashed_in_last_trial*: 
+
 
 ```{r random_3, include=FALSE}
 
-random.3 <- lmer(SoC ~ expectancy + N_drift * crashed + crashed_in_last_trial + N_consecutive_crash_success + 
-                   (1 + expectancy + N_drift*crashed + N_consecutive_crash_success|ID), data = soc_data, REML=FALSE)
+random.3 <- lmer(sqrt(SoC) ~ expectancy + N_drift * crashed + crashed_in_last_trial + N_consecutive_crash_success + 
+                   (1 + expectancy + N_drift*crashed |ID), data = soc_data, REML=FALSE)
 summary(random.3)
 
 ```
 
-Deleting N_drift from random slopes:
+Deleting N_drift from random slopes (it's the smallest effect and may be hard to split up upon IDs):
 ```{r random_4, include=FALSE}
 
-random.4 <- lmer(SoC ~ expectancy + N_drift * crashed + crashed_in_last_trial + N_consecutive_crash_success + 
-                   (1 + expectancy + N_drift + crashed_in_last_trial + N_consecutive_crash_success|ID), data = soc_data, REML=FALSE)
-summary(random.4)
+random.4 <- lmer(sqrt(SoC) ~ expectancy + N_drift * crashed + crashed_in_last_trial + N_consecutive_crash_success + 
+                   (1 + expectancy + crashed |ID), data = soc_data, REML=FALSE)
 
 ```
+Ok the model converges. We will start here: random.4 is our most complex model and we try to switch in and out random slopes to see whether other random effects structures better capture the effects the data.
 
-Instead deleting crashed:
+Deleting crashed:
 ```{r random_5, include=FALSE}
 
-random.5 <- lmer(SoC ~ expectancy + N_drift * crashed + crashed_in_last_trial + N_consecutive_crash_success + 
-                   (1 + expectancy + crashed + crashed_in_last_trial + N_consecutive_crash_success|ID), data = soc_data, REML=FALSE)
-summary(random.5)
+random.5 <- lmer(sqrt(SoC) ~ expectancy + N_drift * crashed + crashed_in_last_trial + N_consecutive_crash_success + 
+                   (1 + expectancy |ID), data = soc_data, REML=FALSE)
 
 ```
 
-Deleting expectancy:
+Deleting expectancy instead:
 ```{r random_6, include=FALSE}
 
-random.6 <- lmer(SoC ~ expectancy + N_drift * crashed + crashed_in_last_trial + N_consecutive_crash_success + 
-                   (1 + N_drift + crashed + crashed_in_last_trial + N_consecutive_crash_success|ID), data = soc_data, REML=FALSE)
-summary(random.6)
+random.6 <- lmer(sqrt(SoC) ~ expectancy + N_drift * crashed + crashed_in_last_trial + N_consecutive_crash_success + 
+                   (1 + crashed |ID), data = soc_data, REML=FALSE)
+
 
 ```
 
 ```{r model_comparison1, echo=FALSE}
 
-anova(fix.6, random.1, random.2, random.3, random.4, random.5, random.6)
+anova(fix.7, random.4, random.5, random.6)
 
 ```
-random.5 has the lowest BIC, meaning that it's our best fitting model.
+random.4 has the lowest BIC, meaning that it's our best fitting model.
 
-We might want to test whether we can delete even more random slopes:
+We will now try to add some of the other random slopes again while also keeping *expectancy* and *crashed*.
+
+Starting with *N_drift* (this time without the interaction effect)
 ```{r random_7, include=FALSE}
 
-random.7 <- lmer(SoC ~ expectancy + N_drift * crashed + crashed_in_last_trial + N_consecutive_crash_success + 
-                   (1 + crashed + crashed_in_last_trial + N_consecutive_crash_success|ID), data = soc_data, REML=FALSE)
+random.7 <- lmer(sqrt(SoC) ~ expectancy + N_drift * crashed + crashed_in_last_trial + N_consecutive_crash_success + 
+                   (1 + expectancy + N_drift + crashed |ID), data = soc_data, REML=FALSE)
 #summary(random.7)
 
 ```
 
+Adding *crashed_in_last_trial* back in:
 ```{r random_8, include=FALSE}
 
-random.8 <- lmer(SoC ~ expectancy + N_drift * crashed + crashed_in_last_trial + N_consecutive_crash_success + (1 + expectancy + crashed + N_consecutive_crash_success | ID), data = soc_data, REML=FALSE)
+random.8 <- lmer(sqrt(SoC) ~ expectancy + N_drift * crashed + crashed_in_last_trial + N_consecutive_crash_success + 
+                   (1 + expectancy + crashed + crashed_in_last_trial | ID), data = soc_data, REML=FALSE)
 #summary(random.8)
 
 ```
+Nope *crashed_in_last_trial* seems to cause some issues with convergence. We will omit random.8 in model selection later.
 
+What about *N_consecutive_crash_success*?
 ```{r random_9, include=FALSE}
 
-random.9 <- lmer(SoC ~ expectancy + N_drift * crashed + crashed_in_last_trial + N_consecutive_crash_success + (1 + expectancy + crashed + crashed_in_last_trial | ID), data = soc_data, REML=FALSE)
+random.9 <- lmer(sqrt(SoC) ~ expectancy + N_drift * crashed + crashed_in_last_trial + N_consecutive_crash_success + 
+                   (1 + expectancy + crashed + N_consecutive_crash_success | ID), data = soc_data, REML=FALSE)
 #summary(random.9)
 
 ```
+*N_consecutive_crash_success* also leads to non-convergence.
 
+Let's do a comparison:
 ```{r model_comparison1.2, include=FALSE}
 
-anova(random.5, random.7, random.8, random.9)
+anova(random.4, random.7)
 
 ```
 
-*random.8* "wins." We will continue with this one and try to reduce complexity even more.
-
+*random.7* "wins." In a last effort we will try to drop *expectancy*:
 ```{r random_10, include=FALSE}
 
-random.10 <- lmer(SoC ~ expectancy + N_drift * crashed + crashed_in_last_trial + N_consecutive_crash_success + (1 + crashed + N_consecutive_crash_success | ID), data = soc_data, REML=FALSE)
+random.10 <- lmer(sqrt(SoC) ~ expectancy + N_drift * crashed + crashed_in_last_trial + N_consecutive_crash_success + 
+                   (1 + N_drift + crashed |ID), data = soc_data, REML=FALSE)
 #summary(random.10)
-
-```
-
-```{r random_11, include=FALSE}
-
-random.11 <- lmer(SoC ~ expectancy + N_drift * crashed + crashed_in_last_trial + N_consecutive_crash_success + (1 + expectancy + N_consecutive_crash_success | ID), data = soc_data, REML=FALSE)
-#summary(random.11)
-
-```
-
-```{r random_12, include=FALSE}
-
-random.12 <- lmer(SoC ~ expectancy + N_drift * crashed + crashed_in_last_trial + N_consecutive_crash_success + (1 + expectancy + crashed | ID), data = soc_data, REML=FALSE)
-#summary(random.12)
 
 ```
 
 ```{r model_comparison1.3, include=FALSE}
 
-anova(random.8, random.10, random.11, random.12)
+anova(random.7, random.10)
+
+```
+BIX increases and we see a significant difference in the model likelihood. This means we would give up explanatory power when dropping *expectancy*. random.7 therefore is our final model!
+
+```{r taking_a_look, echo=FALSE}
+
+summary(random.7)
 
 ```
 
-Nope *random.8* prevails. We will stick with this one.
-
-```{r inspection1, echo=FALSE}
-
-summary(random.8)
-
-```
 ## Generating simulations based on the final selected model
 
 parametric bootstrap:
 ```{r bootstrap1, include=FALSE}
 
-confint(random.8, nsim=N_iterations, parm=c('expectancy', 'N_drift', 'crashed', 'crashed_in_last_trial', 'N_consecutive_crash_success'), method='boot')
+confint(random.7, nsim=N_iterations, parm=c('expectancy', 'N_drift', 'crashed', 'crashed_in_last_trial', 'N_consecutive_crash_success'), method='boot')
 
 ```
+We got a few failed convergences here, but that is ok, we chose the most complex model after all.
 
-                                  2.5 %       97.5 %
-expectancy                   0.14403529  0.350333578
-N_drift                      0.23597049  0.340526273
-crashed                     -2.06481541 -1.141211734
-crashed_in_last_trial       -0.41605286 -0.188273849
-N_consecutive_crash_success -0.03244936  0.003356433
+Results:
+                                   2.5 %        97.5 %
+expectancy                   0.061970392  0.1172224888
+N_drift                      0.051522884  0.1010306586
+crashed                     -0.377887632 -0.2715667616
+crashed_in_last_trial       -0.045589722 -0.0128242066
+N_consecutive_crash_success -0.001689916 -0.0003068576
 
 
 # Predicting Expectancy
-We hypothesize that the variable *expectancy* reflects the prior of participants about the self-efficiency. We will explore what constitutes this prior, i.e. which variables best explain *expectancy*. We already have a candidates in mind...
+We hypothesize that the variable *expectancy* reflects the prior belief of participants about the self-efficiency. We will explore what constitutes this prior, i.e. which variables best explain *expectancy*. We already have a candidates in mind...
 
 ## Box Cox - analysis
-
 ```{r box_cox2, include=FALSE}
 
 lambda_expect <- boxcox(lm(soc_data$expectancy ~ 1))
@@ -345,11 +366,11 @@ summary(null.2)
 Inter-Class Correlation
 ```{r ICC2, include=FALSE}
 
-0.365 / (0.365+1.374)
+1.2218 / (1.2218+0.7984)
 
 ```
 
-ID explains roughly 20.99% of the total variance in expectancy.
+ID explains roughly 60.48% of the total variance in expectancy.
 
 ## Exploring fixed effects
 Same procedure as above...
@@ -362,12 +383,13 @@ summary(fix.1)
 
 ```
 
-We see that *Openness* and *Conscientiousness* don't significantly influence expectancy. We will try to delete them.
+We see that the NEO-FFI dimensions do not significantly influence expectancy. Only *Openness* "approaches" significance. We will try do delete the other dimensions first. After that we might drop *crashed_in_last_trial*.
 
+Starting with dropping *Conscientiousness*
 ```{r fix_2, include=FALSE}
 
 fix.2 <- lmer(expectancy ~  crashed_in_last_trial + N_consecutive_crash_success + SoC_last_trial + 
-                Neuroticism + Extraversion + Agreeableness + (1|ID), data = soc_data, REML=FALSE)
+                Neuroticism + Extraversion + Openness + Agreeableness + (1|ID), data = soc_data, REML=FALSE)
 summary(fix.2)
 
 ```
@@ -378,234 +400,133 @@ anova(fix.1, fix.2)
 
 ```
 
-Deleting those variables didn't significantly affect the predictive power of our model (no significance in Pr(>Chisq)).
+Proceeding with fix.2
 
-Let's see if we can reduce complexity even more:
+Let's see if we can reduce complexity even more. Dropping *Agreeableness*:
 ```{r fix_3, include=FALSE}
 
-fix.3 <- lmer(expectancy ~  N_consecutive_crash_success + SoC_last_trial + 
-                Neuroticism + Extraversion + Agreeableness + (1|ID), data = soc_data, REML=FALSE)
+fix.3 <- lmer(expectancy ~  crashed_in_last_trial + N_consecutive_crash_success + SoC_last_trial + 
+                Neuroticism + Extraversion + Openness + (1|ID), data = soc_data, REML=FALSE)
 #summary(fix.3)
 
 anova(fix.2, fix.3)
 
 ```
-Nope we see a significant difference with a hike in BIC. We will stick to the structure of *fix.2*.
+Again deleting the effect is advised. Proceeding with fix.3.
+
+Dropping *Neuroticism*
+```{r fix_4, include=FALSE}
+
+fix.4 <- lmer(expectancy ~  crashed_in_last_trial + N_consecutive_crash_success + SoC_last_trial + 
+                Extraversion + Openness + (1|ID), data = soc_data, REML=FALSE)
+#summary(fix.4)
+
+anova(fix.3, fix.4)
+
+```
+Dropping *Neuroticism* also decreases BIC and doesn't significantly affects model likelihood. Proceeding with fix.4.
+
+What about *Extraversion*?
+```{r fix_5, include=FALSE}
+
+fix.5 <- lmer(expectancy ~  crashed_in_last_trial + N_consecutive_crash_success + SoC_last_trial + 
+                Openness + (1|ID), data = soc_data, REML=FALSE)
+#summary(fix.5)
+
+anova(fix.4, fix.5)
+
+```
+Proceeding with fix.5.
+
+Can we also drop *Openness* the last NEO-FFI dimension?
+```{r fix_6, include=FALSE}
+
+fix.6 <- lmer(expectancy ~  crashed_in_last_trial + N_consecutive_crash_success + SoC_last_trial 
+              + (1|ID), data = soc_data, REML=FALSE)
+#summary(fix.6)
+
+anova(fix.5, fix.6)
+
+```
+We can safely throw out all the NEO-FFI dimensions. 
+
+Now we will attempt to drop *crashed_in_last_trial*. We strongly assumed that this will definitely affect expectancy, but it didn't show significance earlier, so let's see:
+```{r fix_7, include=FALSE}
+
+fix.7 <- lmer(expectancy ~ N_consecutive_crash_success + SoC_last_trial 
+              + (1|ID), data = soc_data, REML=FALSE)
+#summary(fix.7)
+
+anova(fix.6, fix.7)
+
+```
+*crashed_in_last_trial* is also dropped. Proceeding with fix.7.
 
 ## Exploring random effects structure
 
-Here we will dump all the variable of our fixed effects structure into the random effects structure and see what happens.
+We only have 2 fixed effects left. The model is not complex, but now we will introduce random slope effects into the model and see whether either fixed effect changes across IDs.
 
 ```{r random_1, include=FALSE}
 
-random.1 <- lmer(expectancy ~  crashed_in_last_trial + N_consecutive_crash_success + SoC_last_trial + 
-                Neuroticism + Extraversion + Agreeableness + (1 + crashed_in_last_trial + N_consecutive_crash_success + SoC_last_trial + Neuroticism + Extraversion + Agreeableness|ID), data = soc_data, REML=FALSE)
+random.1 <- lmer(expectancy ~   N_consecutive_crash_success + SoC_last_trial 
+                 + (1 + N_consecutive_crash_success + SoC_last_trial |ID), data = soc_data, REML=FALSE)
 summary(random.1)
 
 ```
 
-Model failed to converge... We need to reduce the random effects structure complexity. 
+Model failed to converge... We need to reduce the complexity of the random effects structure. 
 
-Deleting crashed_in_last_trial because its fixed effect was the "least" significant (arbitrarily chosen starting point):
+Deleting *N_consecutive_crash_success* (arbitrarily chosen starting point):
 ```{r random_2, include=FALSE}
 
-random.2 <- lmer(expectancy ~  crashed_in_last_trial + N_consecutive_crash_success + SoC_last_trial + 
-                Neuroticism + Extraversion + Agreeableness + (1 + N_consecutive_crash_success + SoC_last_trial + Neuroticism + Extraversion + Agreeableness|ID), data = soc_data, REML=FALSE)
+random.2 <- lmer(expectancy ~ N_consecutive_crash_success + SoC_last_trial 
+                 + (1 + SoC_last_trial |ID), data = soc_data, REML=FALSE)
+summary(random.2)
+
+```
+Ok, this model converges. We will take it in the model selection.
+
+Deleting *SoC_last_trial* instead:
+```{r random_3, include=FALSE}
+
+random.3 <- lmer(expectancy ~ N_consecutive_crash_success + SoC_last_trial 
+                 + (1 + N_consecutive_crash_success |ID), data = soc_data, REML=FALSE)
+summary(random.3)
+
+```
+Keeping *N_consecutive_crash_success* as random slope effect causes convergence issues. We'll leave it out.
+
+```{r model_comparison2, include=FALSE}
+
+anova(fix.7, random.2)
+
+```
+random.2 the model with the random slope effect of *SoC_last_trial* yields the lower BIC. We will use random.2 for our hypothesis testing.
+
+
+```{r final_selected_model2, include=FALSE}
+
 summary(random.2)
 
 ```
 
-Deleting Extraversion instead:
-```{r random_3, include=FALSE}
-
-random.3 <- lmer(expectancy ~  crashed_in_last_trial + N_consecutive_crash_success + SoC_last_trial + 
-                Neuroticism + Extraversion + Agreeableness + (1 + crashed_in_last_trial + N_consecutive_crash_success + SoC_last_trial + Neuroticism + Agreeableness|ID), data = soc_data, REML=FALSE)
-summary(random.3)
-
-```
-
-Deleting N_consecutive_crash_success:
-```{r random_4, include=FALSE}
-
-random.4 <- lmer(expectancy ~  crashed_in_last_trial + N_consecutive_crash_success + SoC_last_trial + 
-                Neuroticism + Extraversion + Agreeableness + (1 + crashed_in_last_trial + SoC_last_trial + Neuroticism + Extraversion + Agreeableness|ID), data = soc_data, REML=FALSE)
-summary(random.4)
-
-```
-
-Deleting Neuroticism:
-```{r random_5, include=FALSE}
-
-random.5 <- lmer(expectancy ~  crashed_in_last_trial + N_consecutive_crash_success + SoC_last_trial + 
-                Neuroticism + Extraversion + Agreeableness + (1 + crashed_in_last_trial + N_consecutive_crash_success + SoC_last_trial + Extraversion + Agreeableness|ID), data = soc_data, REML=FALSE)
-summary(random.5)
-
-```
-
-And lastly, deleting crashed_in_last_trial:
-```{r random_6, include=FALSE}
-
-random.6 <- lmer(expectancy ~  crashed_in_last_trial + N_consecutive_crash_success + SoC_last_trial + 
-                Neuroticism + Extraversion + Agreeableness + (1 + N_consecutive_crash_success + SoC_last_trial + Neuroticism + Extraversion + Agreeableness|ID), data = soc_data, REML=FALSE)
-summary(random.6)
-
-```
-
-```{r model_comparison2, include=FALSE}
-
-anova(fix.2, random.1, random.2, random.3, random.4, random.5, random.6)
-
-```
-
-Referring to BIC, **random.5** is the model with the best fit to the data (here we deleted *Neuroticism*).
-
-We can now try to delete even more random effects and get rid of that "Singularity" Warning.
-
-Deleting crashed_in_last_trial on top:
-```{r random_5.1, include=FALSE}
-
-random.5.1 <- lmer(expectancy ~  crashed_in_last_trial + N_consecutive_crash_success + SoC_last_trial + 
-                Neuroticism + Extraversion + Agreeableness + (1 + N_consecutive_crash_success + SoC_last_trial + Extraversion + Agreeableness|ID), data = soc_data, REML=FALSE)
-#summary(random.5.1)
-
-```
-
-```{r random_5.2, include=FALSE}
-
-random.5.2 <- lmer(expectancy ~  crashed_in_last_trial + N_consecutive_crash_success + SoC_last_trial + 
-                Neuroticism + Extraversion + Agreeableness + (1 + crashed_in_last_trial + SoC_last_trial + Extraversion + Agreeableness|ID), data = soc_data, REML=FALSE)
-#summary(random.5.2)
-
-```
-
-
-```{r random_5.3, include=FALSE}
-
-random.5.3 <- lmer(expectancy ~  crashed_in_last_trial + N_consecutive_crash_success + SoC_last_trial + 
-                Neuroticism + Extraversion + Agreeableness + (1 + crashed_in_last_trial + N_consecutive_crash_success + Extraversion + Agreeableness|ID), data = soc_data, REML=FALSE)
-#summary(random.5.3)
-
-```
-
-```{r random_5.4, include=FALSE}
-
-random.5.4 <- lmer(expectancy ~  crashed_in_last_trial + N_consecutive_crash_success + SoC_last_trial + 
-                Neuroticism + Extraversion + Agreeableness + (1 + crashed_in_last_trial + N_consecutive_crash_success + SoC_last_trial + Agreeableness|ID), data = soc_data, REML=FALSE)
-#summary(random.5.4)
-
-```
-
-```{r random_5.5, include=FALSE}
-
-random.5.5 <- lmer(expectancy ~  crashed_in_last_trial + N_consecutive_crash_success + SoC_last_trial + 
-                Neuroticism + Extraversion + Agreeableness + (1 + crashed_in_last_trial + N_consecutive_crash_success + SoC_last_trial + Extraversion|ID), data = soc_data, REML=FALSE)
-#summary(random.5.5)
-
-```
-
-
-```{r model_comparison2.2, include=FALSE}
-
-anova(random.5, random.5.1, random.5.2, random.5.3, random.5.4, random.5.5)
-
-```
-
-*random.5.5* is an even stronger model than *random.5*. It contains no random slope for *Agreeableness*. We may try to delete even more, for example *Extraversion*
-
-```{r randoms_, include=FALSE}
-
-random.5.5.1 <- lmer(expectancy ~  crashed_in_last_trial + N_consecutive_crash_success + SoC_last_trial + 
-                Neuroticism + Agreeableness + (1 + crashed_in_last_trial + N_consecutive_crash_success + SoC_last_trial + Extraversion|ID), data = soc_data, REML=FALSE)
-#summary(random.5.5.1)
-
-anova(random.5.5, random.5.5.1)
-```
-
-going on
-```{r randoms__, include=FALSE}
-
-random.5.5.2 <- lmer(expectancy ~  crashed_in_last_trial + N_consecutive_crash_success + SoC_last_trial + 
-                Neuroticism + Agreeableness + (1 + N_consecutive_crash_success + SoC_last_trial + Extraversion|ID), data = soc_data, REML=FALSE)
-#summary(random.5.5.2)
-
-anova(random.5.5.1, random.5.5.2)
-```
-even better
-
-```{r randoms__, include=FALSE}
-
-random.5.5.3 <- lmer(expectancy ~  crashed_in_last_trial + N_consecutive_crash_success + SoC_last_trial + 
-                Neuroticism + Agreeableness + (1 + SoC_last_trial + Extraversion|ID), data = soc_data, REML=FALSE)
-#summary(random.5.5.3)
-
-anova(random.5.5.2, random.5.5.3)
-```
-
-Nope we should keep *N_consecutive_crash_success* as random slope.
-
-```{r randoms___, include=FALSE}
-
-random.5.5.4 <- lmer(expectancy ~  crashed_in_last_trial + N_consecutive_crash_success + SoC_last_trial + 
-                Neuroticism + Agreeableness + (1 + N_consecutive_crash_success + SoC_last_trial|ID), data = soc_data, REML=FALSE)
-#summary(random.5.5.4)
-
-anova(random.5.5.2, random.5.5.4)
-```
-But we can delete *Extraversion* on top.
-
-```{r randoms____, include=FALSE}
-
-random.5.5.5 <- lmer(expectancy ~  crashed_in_last_trial + N_consecutive_crash_success + SoC_last_trial + 
-                Neuroticism + Agreeableness + (1 + N_consecutive_crash_success|ID), data = soc_data, REML=FALSE)
-#summary(random.5.5.5)
-
-anova(random.5.5.4, random.5.5.5)
-```
-
-Nope I think we're good. We will stick to random.5.5.4 which features random slope effects for N_consecutive_crash_success and SoC_last_trial.
-
-```{r final_selected_model2, include=FALSE}
-
-summary(random.5.5.4)
-
-```
-
-
-
 parametric bootstrap:
 ```{r bootstrap2, include=FALSE}
 
-confint(random.5.5.4, nsim=N_iterations, parm=c('crashed_in_last_trial', 'N_consecutive_crash_success', 'SoC_last_trial', 'Neuroticism', 'Agreeableness'), method='boot')
+confint(random.2, nsim=N_iterations, parm=c('N_consecutive_crash_success', 'SoC_last_trial'), method='boot')
 
 ```
-                                  2.5 %     97.5 %
-crashed_in_last_trial       -0.12960379 0.16119089
-N_consecutive_crash_success  0.01804231 0.06533582
-SoC_last_trial               0.30288064 0.51218197
-Neuroticism                  0.03478384 0.06480541
-Agreeableness               -0.05557517 0.05377814
+Results:
+                                  2.5 %      97.5 %
+N_consecutive_crash_success 0.004662195 0.009166225
+SoC_last_trial              0.298864685 0.436390573
 
-When the bounds of the 95% HPDI are on different sides of the 0-line (for example for *Agreeableness*), it supports the fact the variable doesn't significantly affect *expectancy*.
 
-# Expectancy model for ICCM submission
-Model we will report in article because we can fit it without getting a "overparameterized" warning:
-```{r randoms_____, include=FALSE}
 
-random.. <- lmer(expectancy ~  crashed_in_last_trial + N_consecutive_crash_success + SoC_last_trial + 
-                Neuroticism + Agreeableness + (1|ID), data = soc_data, REML=FALSE)
-summary(random..)
 
-```
 
-```{r bootstrap2, include=FALSE}
 
-confint(random.., nsim=N_iterations, parm=c('crashed_in_last_trial', 'N_consecutive_crash_success', 'SoC_last_trial', 'Neuroticism', 'Agreeableness'), method='boot')
 
-```
-                                  2.5 %       97.5 %
-crashed_in_last_trial        0.06756727  0.392695944
-N_consecutive_crash_success  0.02019581  0.030988987
-SoC_last_trial               0.41257881  0.511888685
-Neuroticism                  0.01623558  0.066064425
-Agreeableness               -0.12198626 -0.001857013
+
+
 
