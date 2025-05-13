@@ -265,7 +265,7 @@ Now we've got a few models to compare:
 anova(fix.9, random.4, random.3, random.2)
 
 ```
-random.2, the model with the most complex random slope effects structure that converges has the lowest BIC, meaning that it's our best fitting model.
+random.2, the model with the most complex random slope effects structure that converges has the lowest BIC, meaning that it's our "best" model.
 
 ```{r taking_a_look, echo=FALSE}
 
@@ -457,7 +457,7 @@ Let's compare the converged models
 anova(fix.7, random.2, random.3)
 
 ```
-random.3 the model with the random slope effect of *N_consecutive_crash_success* yields the lowest BIC. We will use random.3 for our hypothesis testing.
+random.3 the model with the random slope effect of *N_consecutive_crash_success* yields the lowest BIC. We will use random.3 for hypothesis testing.
 
 
 ```{r final_selected_model2, include=FALSE}
@@ -465,7 +465,7 @@ random.3 the model with the random slope effect of *N_consecutive_crash_success*
 summary(random.3)
 
 ```
-That is interesting. We see that the random slope effect in *N_consecutive_crash_success* caused the fixed effect to disappear. That can happen and it actually tells us that the difference in the slopes of this effect is far too different from one person to the next.
+That is interesting. We see that the random slope effect in *N_consecutive_crash_success* caused the fixed effect to disappear. That can happen and it actually tells us that the difference in the slopes of this effect is far too different from one person to the next to be a significant robust effect.
 
 parametric bootstrap:
 ```{r bootstrap2, include=FALSE}
