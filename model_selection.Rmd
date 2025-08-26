@@ -55,6 +55,13 @@ failure_by_level
 
 ```
 
+# New variable - N frames steering while within drift section
+```{r N_frames_steering_while_drift, include=FALSE}
+
+soc_data$N_frames_steering <- soc_data$N_frames_input_in_drift / soc_data$N_drift
+
+```
+Explored how the steering within drift sections (in which steering has no effect) influences SoC responses. Found no effects and thus excluded this posthoc added variable from model selection again.
 
 # Predicting SoC
 
@@ -234,7 +241,7 @@ summary(random.1)
 Starting with *N_drift*:
 ```{r random_2, include=FALSE}
 
-random.2 <- lmer(sqrt(SoC) ~ expectancy + N_drift + crashed + 
+random.2 <- lmer(sqrt(SoC) ~ expectancy + N_drift + crashed +
                    (1 + expectancy + crashed |ID), data = soc_data, REML=FALSE)
 summary(random.2)
 
